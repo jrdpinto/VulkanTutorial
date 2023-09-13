@@ -4,7 +4,8 @@
 #include <iostream>
 #include <stdexcept>
 
-int main() {
+int main()
+{
     p3d::App app{};
 
     try 

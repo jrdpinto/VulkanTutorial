@@ -1,5 +1,6 @@
 #pragma once
 #include "p3d_window.h"
+#include <vulkan/vulkan.h>
 
 namespace p3d
 {
@@ -9,9 +10,14 @@ namespace p3d
         static constexpr int WIDTH = 1024;
         static constexpr int HEIGHT = 768;
 
+        App();
+        ~App();
         void Run();
 
     private:
         Window window_{ WIDTH, HEIGHT, "Potato 3d" };
+        VkInstance instance_;
+
+        void CreateVulkanInstance();
     };
 }
