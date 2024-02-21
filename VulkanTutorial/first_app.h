@@ -16,8 +16,15 @@ namespace p3d
 
     private:
         Window window_{ WIDTH, HEIGHT, "Potato 3d" };
+
         VkInstance instance_;
+        VkPhysicalDevice physicalDevice_;
+        VkDevice logicalDevice_;
+        VkQueue graphicsQueue_;
+        int graphicsQueueFamilyIndex_ = -1;
 
         void CreateVulkanInstance();
+        void ConfigurePhysicalDevice();
+        void ConfigureLogicalDevice();
     };
 }

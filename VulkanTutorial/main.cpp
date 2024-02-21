@@ -6,10 +6,9 @@
 
 int main()
 {
-    p3d::App app{};
-
     try 
     {
+        p3d::App app{};
         app.Run();
     }
     catch (const std::exception &e)
