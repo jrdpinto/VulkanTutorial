@@ -1,11 +1,24 @@
 #pragma once
 #include "p3d_window.h"
 #include <vulkan/vulkan.h>
+#include <vector>
 #include <optional>
 
 namespace p3d
 {
-    class App
+    const std::vector<const char *> deviceExtensions
+    {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+    
+    struct SwapChainDetails 
+    {
+        VkSurfaceCapabilitiesKHR surfaceCapabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentationModes;
+    };
+
+    class Renderer
     {
     public:
         static constexpr int WIDTH = 1024;
@@ -22,8 +35,8 @@ namespace p3d
             }
         };
 
-        App();
-        ~App();
+        Renderer();
+        ~Renderer();
         void Run();
 
     private:
@@ -46,6 +59,10 @@ namespace p3d
         void ConfigureLogicalDevice();
         void CreateSurface();
 
+	    bool CheckInstanceExtensionSupport(const char** requiredExtensions, int count);
+	    bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+
         QueueFamilyIndices GetGraphicsQueueFamilys(const VkPhysicalDevice& device);
+	    SwapChainDetails GetSwapChainDetails(const VkPhysicalDevice& device);
     };
 }

@@ -155,12 +155,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="first_app.cpp" />
+    <ClCompile Include="renderer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="p3d_window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="first_app.h" />
+    <ClInclude Include="renderer.h" />
     <ClInclude Include="p3d_window.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,4 +1,4 @@
-#include "first_app.h"
+#include "renderer.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -8,8 +8,8 @@ int main()
 {
     try 
     {
-        p3d::App app{};
-        app.Run();
+        p3d::Renderer renderer{};
+        renderer.Run();
     }
     catch (const std::exception &e)
     {
