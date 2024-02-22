@@ -64,9 +64,9 @@ namespace p3d
         }
     }
 
-    int GetGraphicsQueueFamilyIndex(const VkPhysicalDevice& device)
+    App::QueueFamilyIndices App::GetGraphicsQueueFamilys(const VkPhysicalDevice& device)
     {
-        int index = -1;
+        App::QueueFamilyIndices indices;
 
         // Look for queue families and verify that at least one queue family supports VK_QUEUE_GRAPHICS_BIT
         uint32_t queueFamilyCount = 0;
@@ -75,16 +75,32 @@ namespace p3d
         std::vector<VkQueueFamilyProperties> queueFamilyList(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilyList.data());
 
-        for (int i = 0; i < queueFamilyCount; ++i)
+        for (uint32_t i = 0; i < queueFamilyCount; ++i)
         {
-            if (queueFamilyList[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            VkQueueFamilyProperties queueFamily = queueFamilyList[i];
+
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
-                index = i;
+                indices.graphicsFamily = i;
+            }
+
+            // Check if Queue Family supports presentation
+            VkBool32 presentationSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_, &presentationSupport);
+
+            // Check if queue is presentation type (can be both graphics and presentation)
+            if (queueFamily.queueCount > 0 && presentationSupport)
+            {
+                indices.presentationFamily = i;
+            }
+
+            if (indices.AreValid())
+            {
                 break;
             }
         }
 
-        return index;
+        return indices;
     }
 
     void App::ConfigurePhysicalDevice()
@@ -102,11 +118,11 @@ namespace p3d
 
         for (const auto& device : devices)
         {
-            int index = GetGraphicsQueueFamilyIndex(device);
-            if (index > -1)
+            QueueFamilyIndices indices = GetGraphicsQueueFamilys(device);
+            if (indices.AreValid())
             {
                 physicalDevice_ = device;
-                graphicsQueueFamilyIndex_ = index;
+                queueFamilyIndices_ = indices;
 
                 break;
             }
@@ -119,19 +135,30 @@ namespace p3d
 
     void App::ConfigureLogicalDevice()
     {
-        VkDeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex_;
-        queueCreateInfo.queueCount = 1;
-        float queuePriority = 1.0f;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        // Vector for queue creation information, and set for family indices
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> queueFamilyIndices = { *(queueFamilyIndices_.graphicsFamily),
+            *(queueFamilyIndices_.presentationFamily) };
+        
+        // Queues the logical device needs to create and info to do so
+        for (uint32_t queueFamilyIndex : queueFamilyIndices)
+        {
+            VkDeviceQueueCreateInfo queueCreateInfo{};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = *(queueFamilyIndices_.graphicsFamily);
+            queueCreateInfo.queueCount = 1;
+            float queuePriority = 1.0f;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
 
         VkPhysicalDeviceFeatures deviceFeatures{};
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.queueCreateInfoCount = 1;
-        createInfo.pQueueCreateInfos = &queueCreateInfo;
+        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.pEnabledFeatures = &deviceFeatures;
         createInfo.enabledExtensionCount = 0;
         
@@ -142,12 +169,22 @@ namespace p3d
             throw std::runtime_error("Failed to create logical device!");
         }
 
-        vkGetDeviceQueue(logicalDevice_, graphicsQueueFamilyIndex_, 0, &graphicsQueue_);
+        vkGetDeviceQueue(logicalDevice_, *(queueFamilyIndices_.graphicsFamily), 0, &graphicsQueue_);
+	    vkGetDeviceQueue(logicalDevice_, *(queueFamilyIndices_.presentationFamily), 0, &presentationQueue_);
+    }
+
+    void App::CreateSurface()
+    {
+        if (glfwCreateWindowSurface(instance_, window_.GetWindow(), nullptr, &surface_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create window surface!");
+        }
     }
 
     App::App()
     {
         CreateVulkanInstance();
+        CreateSurface();
         ConfigurePhysicalDevice();
         ConfigureLogicalDevice();
     }
@@ -155,6 +192,7 @@ namespace p3d
     App::~App()
     {
         vkDestroyDevice(logicalDevice_, nullptr);
+        vkDestroySurfaceKHR(instance_, surface_, nullptr);
         vkDestroyInstance(instance_, nullptr);
     }
 

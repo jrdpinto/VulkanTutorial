@@ -19,6 +19,8 @@ namespace p3d
 
         bool ShouldClose() { return glfwWindowShouldClose(window_); }
 
+        GLFWwindow* GetWindow() { return window_; }
+
     private:
         void InitWindow();
 
