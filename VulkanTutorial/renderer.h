@@ -6,6 +6,7 @@
 
 namespace p3d
 {
+    // NOTE: Swapchain will not work without this extension!
     const std::vector<const char *> deviceExtensions
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -16,6 +17,17 @@ namespace p3d
         VkSurfaceCapabilitiesKHR surfaceCapabilities;
         std::vector<VkSurfaceFormatKHR> formats;
         std::vector<VkPresentModeKHR> presentationModes;
+
+        bool IsValid()
+        {
+            return !formats.empty() && !presentationModes.empty();
+        }
+    };
+
+    struct SwapchainImage 
+    {
+        VkImage image;
+        VkImageView imageView;
     };
 
     class Renderer
@@ -52,17 +64,27 @@ namespace p3d
         VkQueue graphicsQueue_;
         VkQueue presentationQueue_;
 
-	    VkSurfaceKHR surface_;
+        VkSurfaceKHR surface_;
+
+        VkSwapchainKHR swapchain_;
+        SwapChainDetails swapChainDetails_;
+        std::vector<SwapchainImage> swapChainImages_;
+
+        VkFormat selectedSwapChainImageFormat_;
+        VkExtent2D selectedSwapChainExtent_;
 
         void CreateVulkanInstance();
-        void ConfigurePhysicalDevice();
+        void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
         void CreateSurface();
+        void CreateSwapChain();
 
-	    bool CheckInstanceExtensionSupport(const char** requiredExtensions, int count);
-	    bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+        bool CheckInstanceExtensionSupport(const char** requiredExtensions, int count);
+        bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 
         QueueFamilyIndices GetGraphicsQueueFamilys(const VkPhysicalDevice& device);
-	    SwapChainDetails GetSwapChainDetails(const VkPhysicalDevice& device);
+        SwapChainDetails GetSwapChainDetails(const VkPhysicalDevice& device);
+
+        VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     };
 }
