@@ -162,6 +162,7 @@
   <ItemGroup>
     <ClInclude Include="renderer.h" />
     <ClInclude Include="p3d_window.h" />
+    <ClInclude Include="Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\simple_shader.frag" />

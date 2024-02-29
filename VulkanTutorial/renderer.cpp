@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <vector>
 
+#include "Utilities.h"
+
 namespace p3d
 {
 #ifdef VALIDATION_LAYERS_ENABLED 
@@ -151,7 +153,7 @@ namespace p3d
         createInfo.ppEnabledLayerNames = validationLayers.data();
 #else
         createInfo.enabledLayerCount = 0;
-		createInfo.ppEnabledLayerNames = nullptr;
+        createInfo.ppEnabledLayerNames = nullptr;
 #endif
 
         if (!CheckInstanceExtensionSupport(requiredExtensions))
@@ -502,6 +504,51 @@ namespace p3d
         }
     }
 
+    void Renderer::ConfigureGraphicsPipeline()
+    {
+        std::vector<char> vertShader = ReadFile("Shaders/simple_shader.vert.spv");
+        std::vector<char> fragShader = ReadFile("Shaders/simple_shader.frag.spv");
+
+        VkShaderModule vertShaderModule = CreateShaderModule(vertShader);
+        VkShaderModule fragShaderModule = CreateShaderModule(fragShader);
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        // NOTE: Shader modules are only required for pipeline creation
+        vkDestroyShaderModule(logicalDevice_, fragShaderModule, nullptr);
+        vkDestroyShaderModule(logicalDevice_, vertShaderModule, nullptr);
+    }
+
+    VkShaderModule Renderer::CreateShaderModule(const std::vector<char>& code)
+    {
+        // Shader Module creation information
+        VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
+        shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        shaderModuleCreateInfo.codeSize = code.size();
+        shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+    
+        VkShaderModule shaderModule;
+        VkResult result = vkCreateShaderModule(logicalDevice_, &shaderModuleCreateInfo, nullptr, &shaderModule);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create a shader module!");
+        }
+    
+        return shaderModule;
+    }
+
     bool Renderer::CheckInstanceExtensionSupport(std::vector<const char*>& requiredExtensions)
     {
         bool allExtensionsSupported = true;
@@ -589,6 +636,7 @@ namespace p3d
         ConfigurePhysicalDeviceAndSwapChainDetails();
         ConfigureLogicalDevice();
         CreateSwapChain();
+        ConfigureGraphicsPipeline();
     }
 
     Renderer::~Renderer()

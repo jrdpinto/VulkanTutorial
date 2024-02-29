@@ -96,6 +96,7 @@ namespace p3d
         void ConfigureLogicalDevice();
         void CreateSurface();
         void CreateSwapChain();
+        void ConfigureGraphicsPipeline();
 
         bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
@@ -104,5 +105,7 @@ namespace p3d
         SwapChainDetails GetSwapChainDetails(const VkPhysicalDevice& device);
 
         VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+
+        VkShaderModule CreateShaderModule(const std::vector<char>& code);
     };
 }
