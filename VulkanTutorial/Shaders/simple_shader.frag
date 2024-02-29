@@ -1,8 +1,12 @@
 #version 450
 
-layout (location = 0) out vec4 outColor;
+// Interpolated colour from vertex (location must match)
+layout(location = 0) in vec3 fragColour;
 
-void main()
+// Final output colour (must also have location)
+layout(location = 0) out vec4 outColour;
+
+void main() 
 {
-    outColor = vec4(1.0, 0.0, 0.0, 1.0);
+    outColour = vec4(fragColour, 1.0);
 } 

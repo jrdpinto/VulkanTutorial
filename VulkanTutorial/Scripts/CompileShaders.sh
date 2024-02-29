@@ -3,10 +3,9 @@
 function CompileShader()
 {
     local sourceFile=$1
-    local outputFilename="${sourceFile}.spv"
 
-    echo "Compiling $sourceFile to $outputFilename"
-    glslc ${1} -o $outputFilename
+    echo "Compiling $sourceFile"
+    glslangValidator -V ${1}
 }
 
 function ScanDirectory()
