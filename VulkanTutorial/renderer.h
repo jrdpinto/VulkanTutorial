@@ -6,6 +6,15 @@
 
 namespace p3d
 {
+#ifndef NDEBUG
+#define VALIDATION_LAYERS_ENABLED
+#endif
+    
+    // Enable all standard validation layers
+    const std::vector<const char*> validationLayers = {
+    	"VK_LAYER_KHRONOS_validation"
+    };
+
     // NOTE: Swapchain will not work without this extension!
     const std::vector<const char *> deviceExtensions
     {
@@ -49,9 +58,18 @@ namespace p3d
 
         Renderer();
         ~Renderer();
+
         void Run();
 
     private:
+
+#ifdef VALIDATION_LAYERS_ENABLED
+        void CreateDebugCallback();
+        bool CheckValidationLayerSupport();
+
+        VkDebugReportCallbackEXT debugReportCallback_;
+#endif 
+
         Window window_{ WIDTH, HEIGHT, "Potato 3d" };
 
         QueueFamilyIndices queueFamilyIndices_;
@@ -79,7 +97,7 @@ namespace p3d
         void CreateSurface();
         void CreateSwapChain();
 
-        bool CheckInstanceExtensionSupport(const char** requiredExtensions, int count);
+        bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 
         QueueFamilyIndices GetGraphicsQueueFamilys(const VkPhysicalDevice& device);
