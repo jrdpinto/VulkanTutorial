@@ -91,12 +91,18 @@ namespace p3d
         VkFormat selectedSwapChainImageFormat_;
         VkExtent2D selectedSwapChainExtent_;
 
+        VkPipeline graphicsPipeline_;
+        VkPipelineLayout pipelineLayout_;
+
+        VkRenderPass renderPass_;
+
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
         void CreateSurface();
         void CreateSwapChain();
         void ConfigureGraphicsPipeline();
+        void ConfigureRenderPass();
 
         bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
