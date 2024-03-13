@@ -12,7 +12,7 @@ namespace p3d
     
     // Enable all standard validation layers
     const std::vector<const char*> validationLayers = {
-    	"VK_LAYER_KHRONOS_validation"
+        "VK_LAYER_KHRONOS_validation"
     };
 
     // NOTE: Swapchain will not work without this extension!
@@ -88,6 +88,10 @@ namespace p3d
         SwapChainDetails swapChainDetails_;
         std::vector<SwapchainImage> swapChainImages_;
 
+        // Container for all frame buffers - one for each swap chain image
+        std::vector<VkFramebuffer> swapChainFramebuffers_;
+        std::vector<VkCommandBuffer> commandBuffers_;
+
         VkFormat selectedSwapChainImageFormat_;
         VkExtent2D selectedSwapChainExtent_;
 
@@ -96,6 +100,8 @@ namespace p3d
 
         VkRenderPass renderPass_;
 
+        VkCommandPool commandPool_;
+
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
@@ -103,6 +109,11 @@ namespace p3d
         void CreateSwapChain();
         void ConfigureGraphicsPipeline();
         void ConfigureRenderPass();
+        void ConfigureFrameBuffers();
+        void ConfigureCommandPool();
+        void ConfigureCommandBuffers();
+
+        void RecordCommands();
 
         bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);

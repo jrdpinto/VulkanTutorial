@@ -710,6 +710,105 @@ namespace p3d
         }
     }
 
+    void Renderer::ConfigureFrameBuffers()
+    {
+        swapChainFramebuffers_.resize(swapChainImages_.size());
+
+        for (size_t i = 0; i < swapChainImages_.size(); ++i)
+        {
+            VkImageView attachments[] = {swapChainImages_[i].imageView};
+
+            VkFramebufferCreateInfo framebufferCreateInfo{};
+            framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferCreateInfo.renderPass = renderPass_;
+            framebufferCreateInfo.attachmentCount = 1;
+            framebufferCreateInfo.pAttachments = attachments;
+            framebufferCreateInfo.width = selectedSwapChainExtent_.width;
+            framebufferCreateInfo.height = selectedSwapChainExtent_.height;
+            framebufferCreateInfo.layers = 1;
+
+            VkResult result = vkCreateFramebuffer(logicalDevice_, &framebufferCreateInfo, nullptr, 
+                &swapChainFramebuffers_[i]);
+            if (result != VK_SUCCESS)
+            {
+                throw std::runtime_error("Failed to create a Framebuffer!");
+            }
+        }
+    }
+
+    void Renderer::ConfigureCommandPool()
+    {
+        QueueFamilyIndices queueFamilyIndices = GetGraphicsQueueFamilys(physicalDevice_);
+
+        VkCommandPoolCreateInfo poolCreateInfo{};
+        poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolCreateInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;
+        poolCreateInfo.flags = 0;
+
+        VkResult result = vkCreateCommandPool(logicalDevice_, &poolCreateInfo, nullptr, &commandPool_);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create a Command Pool!");
+        }
+    }
+
+    void Renderer::ConfigureCommandBuffers()
+    {
+        commandBuffers_.resize(swapChainFramebuffers_.size());
+
+        VkCommandBufferAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = commandPool_;
+        // 'Primary' indicates that the command buffer will be submitted directly to a queue
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = (uint32_t)commandBuffers_.size();
+
+        VkResult result = vkAllocateCommandBuffers(logicalDevice_, &allocateInfo, commandBuffers_.data());
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to allocate Command Buffers!");
+        }
+    }
+
+    void Renderer::RecordCommands()
+    {
+        VkCommandBufferBeginInfo bufferBeginInfo = {};
+        bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        // Allow buffer to be re-submitted even if it is currently waiting execution
+        bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass_;
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = selectedSwapChainExtent_;
+        VkClearValue clearColour = {0.0f, 0.0f, 0.0f, 1.0f};
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColour;
+
+        for (size_t i = 0; i < commandBuffers_.size(); ++i)
+        {
+            renderPassInfo.framebuffer = swapChainFramebuffers_[i];
+
+            VkResult result = vkBeginCommandBuffer(commandBuffers_[i], &bufferBeginInfo);
+            if (result != VK_SUCCESS)
+            {
+                throw std::runtime_error("Failed to begin recording Command Buffer!");
+            }
+
+            vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+            vkCmdDraw(commandBuffers_[i], 3, 1, 0, 0);
+            vkCmdEndRenderPass(commandBuffers_[i]);
+
+            result = vkEndCommandBuffer(commandBuffers_[i]);
+            if (result != VK_SUCCESS)
+            {
+                throw std::runtime_error("Failed to record Command Buffer!");
+            }
+        }
+    }
+
     VkShaderModule Renderer::CreateShaderModule(const std::vector<char>& code)
     {
         // Shader Module creation information
@@ -719,7 +818,8 @@ namespace p3d
         shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
     
         VkShaderModule shaderModule;
-        VkResult result = vkCreateShaderModule(logicalDevice_, &shaderModuleCreateInfo, nullptr, &shaderModule);
+        VkResult result = vkCreateShaderModule(logicalDevice_, &shaderModuleCreateInfo, nullptr,
+            &shaderModule);
         if (result != VK_SUCCESS)
         {
             throw std::runtime_error("Failed to create a shader module!");
@@ -817,18 +917,29 @@ namespace p3d
         CreateSwapChain();
         ConfigureRenderPass();
         ConfigureGraphicsPipeline();
+        ConfigureFrameBuffers();
+        ConfigureCommandPool();
+        ConfigureCommandBuffers();
+        RecordCommands();
     }
 
     Renderer::~Renderer()
     {
+        vkDestroyCommandPool(logicalDevice_, commandPool_, nullptr);
+        for (auto framebuffer : swapChainFramebuffers_)
+        {
+            vkDestroyFramebuffer(logicalDevice_, framebuffer, nullptr);
+        }
+
         vkDestroyPipeline(logicalDevice_, graphicsPipeline_, nullptr);
-	    vkDestroyPipelineLayout(logicalDevice_, pipelineLayout_, nullptr);
-	    vkDestroyRenderPass(logicalDevice_, renderPass_, nullptr);
+        vkDestroyPipelineLayout(logicalDevice_, pipelineLayout_, nullptr);
+        vkDestroyRenderPass(logicalDevice_, renderPass_, nullptr);
 
         for (auto image : swapChainImages_)
         {
             vkDestroyImageView(logicalDevice_, image.imageView, nullptr);
         }
+
         vkDestroySwapchainKHR(logicalDevice_, swapchain_, nullptr);
 
         vkDestroyDevice(logicalDevice_, nullptr);
