@@ -5,7 +5,7 @@ function CompileShader()
     local sourceFile=$1
 
     echo "Compiling $sourceFile"
-    glslangValidator -V ${1}
+    glslangValidator -V ${1} -o ${1}.spv
 }
 
 function ScanDirectory()
