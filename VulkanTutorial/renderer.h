@@ -1,8 +1,10 @@
 #pragma once
-#include "p3d_window.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <optional>
+
+#include "p3d_window.h"
+#include "Mesh.h"
 
 namespace p3d
 {
@@ -107,6 +109,8 @@ namespace p3d
         std::vector<VkFence> drawFences_;
 
         int currentFrame_ = 0;
+
+        Mesh mesh_;
 
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();

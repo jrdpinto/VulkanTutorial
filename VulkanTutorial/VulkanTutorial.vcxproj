@@ -155,11 +155,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="p3d_window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="p3d_window.h" />
     <ClInclude Include="Utilities.h" />

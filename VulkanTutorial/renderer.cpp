@@ -529,16 +529,31 @@ namespace p3d
 
         VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        // Position Attribute
+        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions;
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+        // Colour Attribute
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, col);
+
+        // -- VERTEX INPUT --
         VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo{};
         vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-
-        // List of Vertex Binding Descriptions (data spacing/stride information)
-        vertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-        vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-
-        // List of Vertex Attribute Descriptions (data format and where to bind to/from)
-        vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+        vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+        vertexInputCreateInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputCreateInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         // Input Assembly
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -631,7 +646,8 @@ namespace p3d
         pipelineCreateInfo.subpass = 0;
         pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-        result = vkCreateGraphicsPipelines(logicalDevice_, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline_);
+        result = vkCreateGraphicsPipelines(logicalDevice_, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+            &graphicsPipeline_);
         if (result != VK_SUCCESS)
         {
             throw std::runtime_error("Failed to create Graphics Pipeline!");
@@ -671,7 +687,7 @@ namespace p3d
         subpass.pColorAttachments = &colourAttachmentReference;
 
         // Need to determine when layout transitions occur using subpass dependencies
-        std::array<VkSubpassDependency, 2> subpassDependencies;
+        std::array<VkSubpassDependency, 2> subpassDependencies{};
 
         // Conversion from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         // Transition must happen after...
@@ -791,19 +807,25 @@ namespace p3d
         for (size_t i = 0; i < commandBuffers_.size(); ++i)
         {
             renderPassInfo.framebuffer = swapChainFramebuffers_[i];
+            VkCommandBuffer& commandBuffer = commandBuffers_[i];
 
-            VkResult result = vkBeginCommandBuffer(commandBuffers_[i], &bufferBeginInfo);
+            VkResult result = vkBeginCommandBuffer(commandBuffer, &bufferBeginInfo);
             if (result != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to begin recording Command Buffer!");
             }
 
-            vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-            vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
-            vkCmdDraw(commandBuffers_[i], 3, 1, 0, 0);
-            vkCmdEndRenderPass(commandBuffers_[i]);
+            vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-            result = vkEndCommandBuffer(commandBuffers_[i]);
+            VkBuffer vertexBuffers[] = {mesh_.GetVertexBuffer()};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+            vkCmdDraw(commandBuffer, (uint32_t)mesh_.GetVertexCount(), 1, 0, 0);
+            vkCmdEndRenderPass(commandBuffer);
+
+            result = vkEndCommandBuffer(commandBuffer);
             if (result != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to record Command Buffer!");
@@ -992,6 +1014,15 @@ namespace p3d
         CreateSurface();
         ConfigurePhysicalDeviceAndSwapChainDetails();
         ConfigureLogicalDevice();
+
+        mesh_ = Mesh(physicalDevice_, logicalDevice_,
+                {{ {0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
+                {{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f} },
+                {{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f} },
+                {{ -0.4, 0.4, 0.0 }, {0.0f, 0.0f, 1.0f} },
+                {{ -0.4, -0.4, 0.0 }, {1.0f, 1.0f, 0.0f} },
+                {{ 0.4, -0.4, 0.0 }, {1.0f, 0.0f, 0.0f}}});
+
         CreateSwapChain();
         ConfigureRenderPass();
         ConfigureGraphicsPipeline();
@@ -1006,6 +1037,8 @@ namespace p3d
     {
         vkDeviceWaitIdle(logicalDevice_);
 
+        mesh_.DestroyVertexBuffer();
+
         for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
         {
             vkDestroySemaphore(logicalDevice_, renderFinished_[i], nullptr);
@@ -1015,7 +1048,7 @@ namespace p3d
 
         vkDestroyCommandPool(logicalDevice_, commandPool_, nullptr);
 
-        for (auto framebuffer : swapChainFramebuffers_)
+        for (VkFramebuffer& framebuffer : swapChainFramebuffers_)
         {
             vkDestroyFramebuffer(logicalDevice_, framebuffer, nullptr);
         }
@@ -1024,7 +1057,7 @@ namespace p3d
         vkDestroyPipelineLayout(logicalDevice_, pipelineLayout_, nullptr);
         vkDestroyRenderPass(logicalDevice_, renderPass_, nullptr);
 
-        for (auto image : swapChainImages_)
+        for (SwapchainImage& image : swapChainImages_)
         {
             vkDestroyImageView(logicalDevice_, image.imageView, nullptr);
         }
