@@ -10,6 +10,8 @@
 
 namespace p3d
 {
+    const int MAX_FRAME_DRAWS = 3;
+
 #ifdef VALIDATION_LAYERS_ENABLED 
     static VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
         const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
@@ -809,6 +811,56 @@ namespace p3d
         }
     }
 
+    void Renderer::Render()
+    {
+        VkFence* drawFence = &drawFences_[currentFrame_];
+        VkSemaphore* imageAvailable = &imageAvailable_[currentFrame_];
+        VkSemaphore* renderFinished = &renderFinished_[currentFrame_];
+        constexpr uint64_t maxWait = std::numeric_limits<uint64_t>::max();
+
+        vkWaitForFences(logicalDevice_, 1, drawFence, VK_TRUE, maxWait);
+        vkResetFences(logicalDevice_, 1, drawFence);
+
+        uint32_t imageIndex;
+        vkAcquireNextImageKHR(logicalDevice_, swapchain_, maxWait, *imageAvailable, VK_NULL_HANDLE, &imageIndex);
+
+        VkSubmitInfo submitInfo = {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = imageAvailable;
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffers_[imageIndex];
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &renderFinished_[currentFrame_];
+
+        // Submit command buffer to queue
+        VkResult result = vkQueueSubmit(graphicsQueue_, 1, &submitInfo, *drawFence);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to submit Command Buffer to Queue!");
+        }
+
+        // -- PRESENT RENDERED IMAGE TO SCREEN --
+        VkPresentInfoKHR presentInfo = {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = renderFinished;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &swapchain_;
+        presentInfo.pImageIndices = &imageIndex;
+
+        // Present image
+        result = vkQueuePresentKHR(presentationQueue_, &presentInfo);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to present Image!");
+        }
+
+        currentFrame_ = (currentFrame_ + 1) % MAX_FRAME_DRAWS;
+    }
+
     VkShaderModule Renderer::CreateShaderModule(const std::vector<char>& code)
     {
         // Shader Module creation information
@@ -905,6 +957,32 @@ namespace p3d
         return allExtensionsSupported;
     }
 
+    void Renderer::InitSynchronisation()
+    {
+        imageAvailable_.resize(MAX_FRAME_DRAWS);
+        renderFinished_.resize(MAX_FRAME_DRAWS);
+        drawFences_.resize(MAX_FRAME_DRAWS);
+
+        // Semaphore creation information
+        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        // Fence creation information
+        VkFenceCreateInfo fenceCreateInfo = {};
+        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
+        {
+            if (vkCreateSemaphore(logicalDevice_, &semaphoreCreateInfo, nullptr, &imageAvailable_[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(logicalDevice_, &semaphoreCreateInfo, nullptr, &renderFinished_[i]) != VK_SUCCESS ||
+                vkCreateFence(logicalDevice_, &fenceCreateInfo, nullptr, &drawFences_[i]) != VK_SUCCESS)
+            {
+                throw std::runtime_error("Failed to create a Semaphore and/or Fence!");
+            }
+        }
+    }
+
     Renderer::Renderer()
     {
         CreateVulkanInstance();
@@ -921,11 +999,22 @@ namespace p3d
         ConfigureCommandPool();
         ConfigureCommandBuffers();
         RecordCommands();
+        InitSynchronisation();
     }
 
     Renderer::~Renderer()
     {
+        vkDeviceWaitIdle(logicalDevice_);
+
+        for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
+        {
+            vkDestroySemaphore(logicalDevice_, renderFinished_[i], nullptr);
+            vkDestroySemaphore(logicalDevice_, imageAvailable_[i], nullptr);
+            vkDestroyFence(logicalDevice_, drawFences_[i], nullptr);
+        }
+
         vkDestroyCommandPool(logicalDevice_, commandPool_, nullptr);
+
         for (auto framebuffer : swapChainFramebuffers_)
         {
             vkDestroyFramebuffer(logicalDevice_, framebuffer, nullptr);
@@ -957,6 +1046,7 @@ namespace p3d
         while (!window_.ShouldClose())
         {
             glfwPollEvents();
+            Render();
         }
     }
 }

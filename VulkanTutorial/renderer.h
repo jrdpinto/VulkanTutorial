@@ -102,6 +102,12 @@ namespace p3d
 
         VkCommandPool commandPool_;
 
+        std::vector<VkSemaphore> imageAvailable_;
+        std::vector<VkSemaphore> renderFinished_;
+        std::vector<VkFence> drawFences_;
+
+        int currentFrame_ = 0;
+
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
@@ -115,8 +121,12 @@ namespace p3d
 
         void RecordCommands();
 
+        void Render();
+
         bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+
+        void InitSynchronisation();
 
         QueueFamilyIndices GetGraphicsQueueFamilys(const VkPhysicalDevice& device);
         SwapChainDetails GetSwapChainDetails(const VkPhysicalDevice& device);
