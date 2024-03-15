@@ -110,7 +110,7 @@ namespace p3d
 
         int currentFrame_ = 0;
 
-        Mesh mesh_;
+        std::vector<Mesh> meshes_;
 
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();

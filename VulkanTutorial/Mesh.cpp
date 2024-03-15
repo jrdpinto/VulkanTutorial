@@ -11,6 +11,23 @@ Mesh::Mesh(VkPhysicalDevice physicalDevice, VkDevice device, const std::vector<V
 
 Mesh::~Mesh()
 {
+    DestroyVertexBuffer();
+}
+
+
+Mesh::Mesh(Mesh&& other)
+{
+    vertexCount_ = other.vertexCount_;
+    vertexBuffer_ = other.vertexBuffer_;
+    vertexBufferMemory_ = other.vertexBufferMemory_;
+    physicalDevice_ = other.physicalDevice_;
+    device_ = other.device_;
+
+    other.vertexCount_ = 0;
+    other.vertexBuffer_ = VK_NULL_HANDLE;
+    other.vertexBufferMemory_ = VK_NULL_HANDLE;
+    other.physicalDevice_ = VK_NULL_HANDLE;
+    other.device_ = VK_NULL_HANDLE;
 }
 
 int Mesh::GetVertexCount()
@@ -25,8 +42,11 @@ VkBuffer Mesh::GetVertexBuffer()
 
 void Mesh::DestroyVertexBuffer()
 {
-    vkDestroyBuffer(device_, vertexBuffer_, nullptr);
-    vkFreeMemory(device_, vertexBufferMemory_, nullptr);
+    if (vertexBuffer_ && device_ && vertexBufferMemory_)
+    {
+        vkDestroyBuffer(device_, vertexBuffer_, nullptr);
+        vkFreeMemory(device_, vertexBufferMemory_, nullptr);
+    }
 }
 
 void Mesh::CreateVertexBuffer(const std::vector<Vertex>& vertices)

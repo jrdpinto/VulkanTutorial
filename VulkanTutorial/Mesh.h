@@ -15,6 +15,7 @@ class Mesh
 public:
     Mesh() = default;
     Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, const std::vector<Vertex>& vertices);
+    Mesh(Mesh&& other);
 
     int GetVertexCount();
     VkBuffer GetVertexBuffer();

@@ -804,6 +804,9 @@ namespace p3d
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColour;
 
+        // Single mesh for now
+        Mesh& mesh = meshes_[0];
+
         for (size_t i = 0; i < commandBuffers_.size(); ++i)
         {
             renderPassInfo.framebuffer = swapChainFramebuffers_[i];
@@ -818,11 +821,11 @@ namespace p3d
             vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-            VkBuffer vertexBuffers[] = {mesh_.GetVertexBuffer()};
+            VkBuffer vertexBuffers[] = {mesh.GetVertexBuffer()};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-            vkCmdDraw(commandBuffer, (uint32_t)mesh_.GetVertexCount(), 1, 0, 0);
+            vkCmdDraw(commandBuffer, (uint32_t)mesh.GetVertexCount(), 1, 0, 0);
             vkCmdEndRenderPass(commandBuffer);
 
             result = vkEndCommandBuffer(commandBuffer);
@@ -1015,13 +1018,13 @@ namespace p3d
         ConfigurePhysicalDeviceAndSwapChainDetails();
         ConfigureLogicalDevice();
 
-        mesh_ = Mesh(physicalDevice_, logicalDevice_,
+        meshes_.push_back(std::move(Mesh(physicalDevice_, logicalDevice_,
                 {{ {0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
                 {{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f} },
                 {{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f} },
                 {{ -0.4, 0.4, 0.0 }, {0.0f, 0.0f, 1.0f} },
                 {{ -0.4, -0.4, 0.0 }, {1.0f, 1.0f, 0.0f} },
-                {{ 0.4, -0.4, 0.0 }, {1.0f, 0.0f, 0.0f}}});
+                {{ 0.4, -0.4, 0.0 }, {1.0f, 0.0f, 0.0f}}})));
 
         CreateSwapChain();
         ConfigureRenderPass();
@@ -1037,7 +1040,7 @@ namespace p3d
     {
         vkDeviceWaitIdle(logicalDevice_);
 
-        mesh_.DestroyVertexBuffer();
+        meshes_.clear();
 
         for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
         {
