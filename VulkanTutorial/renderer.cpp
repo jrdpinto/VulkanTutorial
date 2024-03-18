@@ -6,8 +6,6 @@
 #include <vector>
 #include <array>
 
-#include "Utilities.h"
-
 namespace p3d
 {
     const int MAX_FRAME_DRAWS = 3;
@@ -804,9 +802,6 @@ namespace p3d
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColour;
 
-        // Single mesh for now
-        Mesh& mesh = meshes_[0];
-
         for (size_t i = 0; i < commandBuffers_.size(); ++i)
         {
             renderPassInfo.framebuffer = swapChainFramebuffers_[i];
@@ -821,11 +816,15 @@ namespace p3d
             vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-            VkBuffer vertexBuffers[] = {mesh.GetVertexBuffer()};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-            vkCmdDraw(commandBuffer, (uint32_t)mesh.GetVertexCount(), 1, 0, 0);
+            for (Mesh& mesh : meshes_)
+            {
+                VkBuffer vertexBuffers[] = { mesh.GetVertexBuffer() };
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(commandBuffer, (uint32_t)(mesh.GetIndexCount()), 1, 0, 0, 0);
+            }
+            
             vkCmdEndRenderPass(commandBuffer);
 
             result = vkEndCommandBuffer(commandBuffer);
@@ -1017,23 +1016,27 @@ namespace p3d
         CreateSurface();
         ConfigurePhysicalDeviceAndSwapChainDetails();
         ConfigureLogicalDevice();
-
-        meshes_.push_back(std::move(Mesh(physicalDevice_, logicalDevice_,
-                {{ {0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
-                {{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f} },
-                {{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f} },
-                {{ -0.4, 0.4, 0.0 }, {0.0f, 0.0f, 1.0f} },
-                {{ -0.4, -0.4, 0.0 }, {1.0f, 1.0f, 0.0f} },
-                {{ 0.4, -0.4, 0.0 }, {1.0f, 0.0f, 0.0f}}})));
-
         CreateSwapChain();
         ConfigureRenderPass();
         ConfigureGraphicsPipeline();
         ConfigureFrameBuffers();
         ConfigureCommandPool();
+        GenerateMeshes();
         ConfigureCommandBuffers();
         RecordCommands();
         InitSynchronisation();
+    }
+
+    void Renderer::GenerateMeshes()
+    {
+        meshes_.clear();
+
+        meshes_.push_back(std::move(Mesh(physicalDevice_, logicalDevice_, graphicsQueue_, commandPool_,
+            {{{ -0.1, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }},
+            {{ -0.1, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }},
+            {{ -0.9, 0.4, 0.0 },{ 0.0f, 0.0f, 1.0f }},
+            {{ -0.9, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f }},},
+            {0, 1, 2,2, 3, 0})));
     }
 
     Renderer::~Renderer()

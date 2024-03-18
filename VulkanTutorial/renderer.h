@@ -1,10 +1,12 @@
-#pragma once
+#ifndef RENDERER_H
+#define RENDERER_H
+
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <optional>
-
 #include "p3d_window.h"
 #include "Mesh.h"
+#include "Utilities.h"
 
 namespace p3d
 {
@@ -122,6 +124,7 @@ namespace p3d
         void ConfigureFrameBuffers();
         void ConfigureCommandPool();
         void ConfigureCommandBuffers();
+        void GenerateMeshes();
 
         void RecordCommands();
 
@@ -140,3 +143,5 @@ namespace p3d
         VkShaderModule CreateShaderModule(const std::vector<char>& code);
     };
 }
+
+#endif // RENDERER_H
