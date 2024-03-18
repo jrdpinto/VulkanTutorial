@@ -4,7 +4,10 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <optional>
-#include "p3d_window.h"
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
 #include "Mesh.h"
 #include "Utilities.h"
 
@@ -46,9 +49,6 @@ namespace p3d
     class Renderer
     {
     public:
-        static constexpr int WIDTH = 1024;
-        static constexpr int HEIGHT = 768;
-
         struct QueueFamilyIndices
         {
             std::optional<uint32_t> graphicsFamily;
@@ -60,10 +60,10 @@ namespace p3d
             }
         };
 
-        Renderer();
+        Renderer(GLFWwindow* window);
         ~Renderer();
 
-        void Run();
+        void Render();
 
     private:
 
@@ -73,8 +73,6 @@ namespace p3d
 
         VkDebugReportCallbackEXT debugReportCallback_;
 #endif 
-
-        Window window_{ WIDTH, HEIGHT, "Potato 3d" };
 
         QueueFamilyIndices queueFamilyIndices_;
 
@@ -117,8 +115,8 @@ namespace p3d
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
-        void CreateSurface();
-        void CreateSwapChain();
+        void CreateSurface(GLFWwindow* window);
+        void CreateSwapChain(GLFWwindow* window);
         void ConfigureGraphicsPipeline();
         void ConfigureRenderPass();
         void ConfigureFrameBuffers();
@@ -127,8 +125,6 @@ namespace p3d
         void GenerateMeshes();
 
         void RecordCommands();
-
-        void Render();
 
         bool CheckInstanceExtensionSupport(std::vector<const char*>& extensionList);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);

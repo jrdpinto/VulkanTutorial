@@ -361,9 +361,9 @@ namespace p3d
         vkGetDeviceQueue(logicalDevice_, *(queueFamilyIndices_.presentationFamily), 0, &presentationQueue_);
     }
 
-    void Renderer::CreateSurface()
+    void Renderer::CreateSurface(GLFWwindow* window)
     {
-        if (glfwCreateWindowSurface(instance_, window_.GetWindow(), nullptr, &surface_) != VK_SUCCESS)
+        if (glfwCreateWindowSurface(instance_, window, nullptr, &surface_) != VK_SUCCESS)
         {
             throw std::runtime_error("Failed to create window surface!");
         }
@@ -434,7 +434,7 @@ namespace p3d
         }
     }
 
-    void Renderer::CreateSwapChain()
+    void Renderer::CreateSwapChain(GLFWwindow* window)
     {
         if (!swapChainDetails_.IsValid())
         {
@@ -444,7 +444,7 @@ namespace p3d
         VkSurfaceFormatKHR surfaceFormat = ChooseBestSurfaceFormat(swapChainDetails_.formats);
         selectedSwapChainImageFormat_ = surfaceFormat.format;
         VkPresentModeKHR presentMode = ChooseBestPresentationMode(swapChainDetails_.presentationModes);
-        selectedSwapChainExtent_ = ChooseSwapExtent(swapChainDetails_.surfaceCapabilities, window_.GetWindow());
+        selectedSwapChainExtent_ = ChooseSwapExtent(swapChainDetails_.surfaceCapabilities, window);
 
         VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
         swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -1007,16 +1007,16 @@ namespace p3d
         }
     }
 
-    Renderer::Renderer()
+    Renderer::Renderer(GLFWwindow* window)
     {
         CreateVulkanInstance();
 #ifdef VALIDATION_LAYERS_ENABLED 
         CreateDebugCallback();
 #endif
-        CreateSurface();
+        CreateSurface(window);
         ConfigurePhysicalDeviceAndSwapChainDetails();
         ConfigureLogicalDevice();
-        CreateSwapChain();
+        CreateSwapChain(window);
         ConfigureRenderPass();
         ConfigureGraphicsPipeline();
         ConfigureFrameBuffers();
@@ -1078,14 +1078,5 @@ namespace p3d
 #endif
 
         vkDestroyInstance(instance_, nullptr);
-    }
-
-    void Renderer::Run()
-    {
-        while (!window_.ShouldClose())
-        {
-            glfwPollEvents();
-            Render();
-        }
     }
 }
