@@ -550,7 +550,7 @@ namespace p3d
         vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
         vertexInputCreateInfo.pVertexBindingDescriptions = &bindingDescription;
-        vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputCreateInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
         vertexInputCreateInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         // Input Assembly
@@ -615,8 +615,8 @@ namespace p3d
         // Pipeline Layout
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
         pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutCreateInfo.setLayoutCount = 0;
-        pipelineLayoutCreateInfo.pSetLayouts = nullptr;
+        pipelineLayoutCreateInfo.setLayoutCount = 1;
+        pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout_;
         pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -790,9 +790,7 @@ namespace p3d
     {
         VkCommandBufferBeginInfo bufferBeginInfo = {};
         bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        // Allow buffer to be re-submitted even if it is currently waiting execution
-        bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-
+        
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass_;
@@ -822,6 +820,8 @@ namespace p3d
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, 
+                    &descriptorSets_[i], 0, nullptr);
                 vkCmdDrawIndexed(commandBuffer, (uint32_t)(mesh.GetIndexCount()), 1, 0, 0, 0);
             }
             
@@ -835,7 +835,16 @@ namespace p3d
         }
     }
 
-    void Renderer::Render()
+    void Renderer::UpdateUniformBuffer(uint32_t imageIndex)
+    {
+        void* data;
+        size_t projectionMatrixSize = sizeof(ProjectionMatrices);
+        vkMapMemory(logicalDevice_, uniformBufferMemory_[imageIndex], 0, projectionMatrixSize, 0, &data);
+        memcpy(data, &projectionMatrices_, projectionMatrixSize);
+        vkUnmapMemory(logicalDevice_, uniformBufferMemory_[imageIndex]);
+    }
+
+    void Renderer::Render(float dt)
     {
         VkFence* drawFence = &drawFences_[currentFrame_];
         VkSemaphore* imageAvailable = &imageAvailable_[currentFrame_];
@@ -847,6 +856,12 @@ namespace p3d
 
         uint32_t imageIndex;
         vkAcquireNextImageKHR(logicalDevice_, swapchain_, maxWait, *imageAvailable, VK_NULL_HANDLE, &imageIndex);
+
+        static float rotation = 0.0f;
+        rotation += 36.f * dt;
+        rotation = std::fmod(rotation, 360.0f);
+        projectionMatrices_.model = glm::rotate(glm::mat4(1.0f), glm::radians(rotation), glm::vec3(0.0f, 0.0f, 1.0f));
+        UpdateUniformBuffer(imageIndex);
 
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -888,7 +903,7 @@ namespace p3d
     VkShaderModule Renderer::CreateShaderModule(const std::vector<char>& code)
     {
         // Shader Module creation information
-        VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
+        VkShaderModuleCreateInfo shaderModuleCreateInfo {};
         shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         shaderModuleCreateInfo.codeSize = code.size();
         shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
@@ -902,6 +917,100 @@ namespace p3d
         }
     
         return shaderModule;
+    }
+
+    void Renderer::ConfigureDescriptorSetLayout()
+    {
+        VkDescriptorSetLayoutBinding projectionMatrixBinding {};
+        projectionMatrixBinding.binding = 0;
+        projectionMatrixBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        projectionMatrixBinding.descriptorCount = 1;
+        projectionMatrixBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        projectionMatrixBinding.pImmutableSamplers = nullptr;
+
+        VkDescriptorSetLayoutCreateInfo layoutCreateInfo {};
+        layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutCreateInfo.bindingCount = 1;
+        layoutCreateInfo.pBindings = &projectionMatrixBinding;
+
+        VkResult result = vkCreateDescriptorSetLayout(logicalDevice_, &layoutCreateInfo, nullptr, 
+            &descriptorSetLayout_);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create a Descriptor Set Layout!");
+        }
+    }
+
+    void Renderer::ConfigureUniformBuffers()
+    {
+        VkDeviceSize bufferSize = sizeof(ProjectionMatrices);
+
+        uniformBuffer_.resize(swapChainImages_.size());
+        uniformBufferMemory_.resize(swapChainImages_.size());
+
+        for (size_t i = 0; i < swapChainImages_.size(); ++i)
+        {
+            CreateBuffer(physicalDevice_, logicalDevice_, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer_[i],
+                uniformBufferMemory_[i]);
+        }
+    }
+
+    void Renderer::ConfigureDescriptorPool()
+    {
+        VkDescriptorPoolSize poolSize {};
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = (uint32_t)swapChainImages_.size();
+
+        VkDescriptorPoolCreateInfo poolCreateInfo {};
+        poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolCreateInfo.poolSizeCount = 1;
+        poolCreateInfo.pPoolSizes = &poolSize;
+        poolCreateInfo.maxSets = (uint32_t)swapChainImages_.size();
+
+        VkResult result = vkCreateDescriptorPool(logicalDevice_, &poolCreateInfo, nullptr, &descriptorPool_);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create a Descriptor Pool!");
+        }
+    }
+
+    void Renderer::ConfigureDescriptorSets()
+    {
+        size_t uniformBufferSize = uniformBuffer_.size();
+
+        std::vector<VkDescriptorSetLayout> layouts(uniformBufferSize, descriptorSetLayout_);
+        VkDescriptorSetAllocateInfo allocateInfo {};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocateInfo.descriptorPool = descriptorPool_;
+        allocateInfo.descriptorSetCount = (uint32_t)uniformBufferSize;
+        allocateInfo.pSetLayouts = layouts.data();
+
+        descriptorSets_.resize(uniformBufferSize);
+        VkResult result = vkAllocateDescriptorSets(logicalDevice_, &allocateInfo, descriptorSets_.data());
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to allocate Descriptor Sets!");
+        }
+
+        for (size_t i = 0; i < uniformBufferSize; ++i)
+        {
+            VkDescriptorBufferInfo bufferInfo {};
+            bufferInfo.buffer = uniformBuffer_[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(ProjectionMatrices);
+
+            VkWriteDescriptorSet descriptorWrite {};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = descriptorSets_[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
+
+            vkUpdateDescriptorSets(logicalDevice_, 1, &descriptorWrite, 0, nullptr);
+        }
     }
 
     bool Renderer::CheckInstanceExtensionSupport(std::vector<const char*>& requiredExtensions)
@@ -1018,11 +1127,24 @@ namespace p3d
         ConfigureLogicalDevice();
         CreateSwapChain(window);
         ConfigureRenderPass();
+        ConfigureDescriptorSetLayout();
         ConfigureGraphicsPipeline();
         ConfigureFrameBuffers();
         ConfigureCommandPool();
+
+        float aspectRatio = ((float)selectedSwapChainExtent_.width / (float)selectedSwapChainExtent_.height);
+        projectionMatrices_.perspective = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
+        // Vulkan's Y coordinate is inverted
+        projectionMatrices_.perspective[1][1] *= -1;
+        projectionMatrices_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        projectionMatrices_.model = glm::mat4(1.0f);
+
         GenerateMeshes();
         ConfigureCommandBuffers();
+        ConfigureUniformBuffers();
+        ConfigureDescriptorPool();
+        ConfigureDescriptorSets();
         RecordCommands();
         InitSynchronisation();
     }
@@ -1032,16 +1154,24 @@ namespace p3d
         meshes_.clear();
 
         meshes_.push_back(std::move(Mesh(physicalDevice_, logicalDevice_, graphicsQueue_, commandPool_,
-            {{{ -0.1, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }},
-            {{ -0.1, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }},
-            {{ -0.9, 0.4, 0.0 },{ 0.0f, 0.0f, 1.0f }},
-            {{ -0.9, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f }},},
+            {{{ -0.5, 0.5, 0.0 },{ 1.0f, 0.0f, 0.0f }},
+            {{ 0.5, 0.5, 0.0 },{ 0.0f, 1.0f, 0.0f }},
+            {{ 0.5, -0.5, 0.0 },{ 0.0f, 0.0f, 1.0f }},
+            {{ -0.5, -0.5, 0.0 },{ 1.0f, 1.0f, 0.0f }},},
             {0, 1, 2,2, 3, 0})));
     }
 
     Renderer::~Renderer()
     {
         vkDeviceWaitIdle(logicalDevice_);
+
+        vkDestroyDescriptorPool(logicalDevice_, descriptorPool_, nullptr);
+        vkDestroyDescriptorSetLayout(logicalDevice_, descriptorSetLayout_, nullptr);
+        for (size_t i = 0; i < uniformBuffer_.size(); i++)
+        {
+            vkDestroyBuffer(logicalDevice_, uniformBuffer_[i], nullptr);
+            vkFreeMemory(logicalDevice_, uniformBufferMemory_[i], nullptr);
+        }
 
         meshes_.clear();
 

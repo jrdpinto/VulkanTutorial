@@ -7,6 +7,8 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "Mesh.h"
 #include "Utilities.h"
@@ -63,7 +65,7 @@ namespace p3d
         Renderer(GLFWwindow* window);
         ~Renderer();
 
-        void Render();
+        void Render(float dt);
 
     private:
 
@@ -112,6 +114,21 @@ namespace p3d
 
         std::vector<Mesh> meshes_;
 
+        struct ProjectionMatrices
+        {
+            glm::mat4 perspective;
+            glm::mat4 view;
+            glm::mat4 model;
+        } projectionMatrices_;
+
+        VkDescriptorSetLayout descriptorSetLayout_;
+
+        VkDescriptorPool descriptorPool_;
+        std::vector<VkDescriptorSet> descriptorSets_;
+
+        std::vector<VkBuffer> uniformBuffer_;
+        std::vector<VkDeviceMemory> uniformBufferMemory_;
+
         void CreateVulkanInstance();
         void ConfigurePhysicalDeviceAndSwapChainDetails();
         void ConfigureLogicalDevice();
@@ -123,6 +140,13 @@ namespace p3d
         void ConfigureCommandPool();
         void ConfigureCommandBuffers();
         void GenerateMeshes();
+
+        void ConfigureDescriptorSetLayout();
+        void ConfigureUniformBuffers();
+        void ConfigureDescriptorPool();
+        void ConfigureDescriptorSets();
+
+        void UpdateUniformBuffer(uint32_t imageIndex);
 
         void RecordCommands();
 
